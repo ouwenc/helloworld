@@ -1,0 +1,164 @@
+﻿云存储
+
+主要是针对百度云、阿里云、amazon云存储的一些工作，包括创建buket（全局唯一的，好比磁盘名字）和上载object（完整路径名）。
+
+做以上工作可以有2种方式：1、使用开源指令curl方式；2、使用http方式。
+
+在这里简单说下curl的移植工作：
+
+1、下载curl源码 官网http://curl.haxx.se/  或者 http://download.csdn.net/detail/hsxyellow/7322213
+
+2、移植过程，参考http://blog.sina.com.cn/s/blog_620882f401015zdt.html 或者 http://blog.csdn.net/hsxyellow/article/details/25402499
+
+3、得到curl和相应的库，拷贝到设备中即可使用。
+
+     以5350设备为例子。
+
+     过程：1、把curl和libcurl.so.5拷贝到设备的/system/system/bin和/system/system/lib中。在/system/system/lib中执行ln -s libcurl.so.5 libcurl.so
+
+                2、添加环境变量，执行语句
+
+                     export PATH=/system/system/bin:$PATH
+
+                     export LD_LIBRARY_PATH=/system/system/lib:$LD_LIBRARY_PATH
+
+一、百度云
+
+首先必须先注册，得到百度云的API Key和Secret Key。参考http://developer.baidu.com/console#app/2646575
+
+（注册这一块，后期逐步完善，尝试使用http进行注册）
+
+相应指令：百度云不支持无签名上传
+
+1、创建bucket，bucket必须是全世界都没有使用过的名字。
+
+①指令带签名：curl -v -X PUT http://bcs.duapp.com/aplink?sign=MBO:QMY8ROtYw7oNCTbGRZI5wqYL:LmgUKTHGTidj8hkR9rMVySO0Sq4%3D
+
+②http创建格bucket式大致如下（未验证）
+
+PUT /aplink?sign=MBO:aCLCZtoFQg8I:WQMFNZEhN2k8xxlgikuPfCJMuE8%3D HTTP/1.1
+Host: bcs.duapp.com
+
+Content-Length:0 
+
+aplink是新创建的bucket。
+
+2、上传object
+
+①指令带签名curl -v -T aplink.c http://bcs.duapp.com/aplink/aplink.c?sign=MBO:QMY8ROtYw7oNCTbGRZI5wqYL:wcULN8wbNcGo12c2mkPteihikXE%3D 
+
+②http上传object格式大致如下（未验证）
+
+PUT /aplink/aplink.c?sign=MBO:aCLCZtoFQg8I:WQMFNZEhN2k8xxlgikuPfCJMuE8%3D HTTP/1.1
+Host: bcs.duapp.com
+
+body（文件内容）
+
+aplink.c是本地文件，上传在bucket上保存为aplink.c。
+
+更多操作请参考 http://developer.baidu.com/wiki/index.php?title=docs/cplat/bcs/api
+
+注:这里特别指出sign=MBO:QMY8ROtYw7oNCTbGRZI5wqYL:wcULN8wbNcGo12c2mkPteihikXE%3D 中格式为
+
+sign=Flag:AccessKey:Signature
+
+Flag:表明签名对象的标记
+
+AccessKey:API Key
+
+Signature:数字签名
+
+Signature=urlencode(base64_encode(hash_hmac('sha1', Content, SecretKey,true))) 
+
+Content= Flag + "\n"
+          + "Method=" + "\n"
+          + "Bucket=" + "\n"
+          + "Object=" + "\n"
+          + "Time=" + "\n"
+          + "Ip=" + "\n"
+          + "Size=" + "\n"详细请参考http://developer.baidu.com/wiki/index.php?title=docs/cplat/bcs/access/signed-url
+
+ 
+
+二、阿里云
+
+首先必须先注册，得到阿里云的Access Key ID和Access Key Secret。参考http://i.aliyun.com/access_key/
+
+（注册这一块，后期逐步完善，尝试使用http进行注册）
+
+curl指令上传object
+
+无签名：curl -v -T aplink.jpg http://aplink.oss-cn-beijing.aliyuncs.com/aplink/media/a.jpg?
+
+http上传object
+
+PUT /hsx/aplink/kk.c? HTTP/1.1
+Host: oss.aliyuncs.com
+Content-Type: img/jpg
+Content-Length: 32858
+Date: Fri, 09 May 2014 08:41:05 GMT
+Authorization: OSS 0jOPFYcJ2ooVwoeU:ldgJRmhc81m2MVAfdG8GWousE0M=
+
+注意：
+
+阿里云的服务器有三个，分别是北京、杭州、青岛，各个服务器得出来的地址是不一致的，如下
+
+#define ALY_BEIJING          "http://aplink.oss-cn-beijing.aliyuncs.com"
+#define ALY_HANGZHOU    "http://hsx.oss-cn-hangzhou.aliyuncs.com"
+#define ALY_QINGDAO       "http://hsxyellow.oss-cn-hangzhou.aliyuncs.com"
+
+相应的aplink、hsx、hsxyellow是bucket名字。连接的时候，不能使用上面的Host：oss.aliyuncs.com，而需要使用相应的分服务器名字，如：http://hsx.oss-cn-hangzhou.aliyuncs.com 端口80。
+
+PUT                                                          上传方式
+
+/hsx/aplink/kk.c?                                       保存在云上的完整路径
+
+HTTP/1.1                                                  使用http固定格式
+Host: oss.aliyuncs.com                             固定格式，有人使用分服务器名字，未验证
+Content-Type: img/jpg                             上传文件格式，貌似上传.c文件也能使用这样的写法，其他格式未验证。
+Content-Length: 32858                           上传文件的大小
+Date: Fri, 09 May 2014 08:41:05 GMT    当前GMT时间，不能使用东八区时间。
+Authorization: OSS 0jOPFYcJ2ooVwoeU:ldgJRmhc81m2MVAfdG8GWousE0M=
+
+Authorization格式为：Authorization：（OSS Access Key ID）：（signature）
+
+注意，此处的signature与百度的不一致，此处不用url_encode
+
+ Signature=base64_encode(hash_hmac('sha1', Content, SecretKey,true))
+
+ 
+
+详细请参考I:
+
+http://imgs-storage.cdn.aliyuncs.com/help/oss/OSS_API_20131015.pdf?spm=5176.383663.5.23.JQjiIK&file=OSS_API_20131015.pdf
+
+http://wiki.open.qq.com/wiki/签名参数sign生成说明
+
+其他操作尚未验证 
+
+ 
+
+三、amazon云
+
+amazon云目前只实现了使用curl指令无签名方式上传，主要签名的算法还没有完全搞明白。
+
+各个厂商的签名算法和加密串都是不一样的。
+
+curl无签名上传：curl -v -T aplink.jpg http://aplink.s3.amazonaws.com/a.jpg?
+
+ 
+
+相关参考资料
+
+AWS管理控制台：五步创建S3 bucket策略
+http://cloudgo.cnw.com.cn/cloud-computing/htm2014/20140506_298066.shtml
+
+Amazon S3 REST API详解
+http://qinxuye.me/article/detail-about-amazon-s3-rest-api/
+
+Uploading files to Amazon S3 with REST API
+http://www.anyexample.com/programming/php/uploading_files_to_amazon_s3_with_rest_api.xml
+
+ 
+
+ 注：无签名就是所bucket的权限设置为公有的。
